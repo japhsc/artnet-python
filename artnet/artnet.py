@@ -1,6 +1,4 @@
 import socket
-from enum import Enum
-from typing import Callable
 
 from .helper import (
     ARTNET_REPLY_PARSER,
@@ -17,19 +15,16 @@ from .helper import (
 
 ART_NET_PORT = 6454
 
-
-class TriggerKey(Enum):
-    ASCII = 0
-    MACRO = 1
-    SOFT = 2
-    SHOW = 3
-    UNDEFINED = 4  # 4-255
-
+ASCII = 0
+MACRO = 1
+SOFT = 2
+SHOW = 3
+UNDEFINED = 4  # 4-255
 
 DEFAULT_FPS = 40.0
 
 
-ArtNetCallback = Callable[[OpCode, str, int, any], None]
+ArtNetCallback = any
 
 
 class ArtNet:
