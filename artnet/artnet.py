@@ -1,11 +1,11 @@
 import socket
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Callable
 
 from .helper import (
     ARTNET_REPLY_PARSER,
     OpCode,
-    is_artnet,
+    parse_header,
     pack_address,
     pack_dmx,
     pack_ip,
@@ -29,7 +29,7 @@ class TriggerKey(Enum):
 DEFAULT_FPS = 40.0
 
 
-ArtNetCallback = Callable[[OpCode, str, int, Any], None]
+ArtNetCallback = Callable[[OpCode, str, int, any], None]
 
 
 class ArtNet:
@@ -39,7 +39,6 @@ class ArtNet:
         # Create a UDP socket
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self.sock.bind(("", ART_NET_PORT))
 
         self.register: dict[OpCode, ArtNetCallback] = {}
 
@@ -61,28 +60,32 @@ class ArtNet:
         if op_code in self.register:
             del self.register[op_code]
 
-    def listen(self, timeout: Optional[float] = 3.0) -> None:
-        """Listens for any incoming ArtPollReplies."""
+    def receive(self, buffer_size: int = 1024) -> None:
+        # Buffer size of 1024 bytes
+        data, addr = self.sock.recvfrom(buffer_size)
+        op_code = parse_header(data)
+        if op_code is not None:
+            parser = ARTNET_REPLY_PARSER.get(op_code, lambda x: x)
+            subscriber = self.register.get(op_code)
+
+            if subscriber is None:
+                return
+
+            reply = parser(data)
+            if reply is None:
+                return
+
+            subscriber(op_code, *addr, reply)
+
+    def listen(self, timeout: float | None = 3.0) -> None:
+        """Listens for any incoming ArtNet packages."""
+
+        self.sock.bind(("", ART_NET_PORT))
         self.sock.settimeout(timeout)
 
         try:
             while True:
-                # Buffer size of 1024 bytes
-                data, addr = self.sock.recvfrom(1024)
-                if is_artnet(data) and len(data) >= 10:
-                    op_code = OpCode(data[8:10])
-
-                    parser = ARTNET_REPLY_PARSER.get(op_code, lambda x: x)
-                    subscriber = self.register.get(op_code)
-
-                    if subscriber is None:
-                        continue
-
-                    reply = parser(data)
-                    if reply is None:
-                        continue
-
-                    subscriber(op_code, *addr, reply)
+                self.receive()
 
         except socket.timeout:
             pass
@@ -115,9 +118,9 @@ class ArtNet:
     def configure_ip(
         self,
         dhcp: bool = False,
-        prog_ip: Optional[str] = None,
-        prog_sm: Optional[str] = None,
-        prog_gw: Optional[str] = None,
+        prog_ip: str | None = None,
+        prog_sm: str | None = None,
+        prog_gw: str | None = None,
         reset: bool = False,
     ) -> None:
         """

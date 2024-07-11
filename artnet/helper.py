@@ -1,6 +1,9 @@
 import struct
 from enum import Enum
-from typing import Any, Optional
+
+
+ArtNetFieldDict = dict[str: any] | None
+
 
 # Constants for Art-Net
 ART_NET_HEADER = b"Art-Net\x00"
@@ -10,23 +13,31 @@ ART_NET_ESTA_MAN = struct.pack("<H", 0)  # ESTA Manufacturer code
 
 
 class OpCode(Enum):
-    ArtPoll = struct.pack("<H", 0x2000)
-    ArtPollReply = struct.pack("<H", 0x2100)
-    ArtCommand = struct.pack("<H", 0x2400)
-    ArtTrigger = struct.pack("<H", 0x9900)
-    ArtDmx = struct.pack("<H", 0x5000)
-    ArtNzs = struct.pack("<H", 0x5100)
-    ArtSync = struct.pack("<H", 0x5200)
-    ArtIpProg = struct.pack("<H", 0xF800)
-    ArtIpProgReply = struct.pack("<H", 0xF900)
-    ArtAddress = struct.pack("<H", 0x6000)
+    ArtPoll = 0x2000
+    ArtPollReply = 0x2100
+    ArtCommand = 0x2400
+    ArtTrigger = 0x9900
+    ArtDmx = 0x5000
+    ArtNzs = 0x5100
+    ArtSync = 0x5200
+    ArtIpProg = 0xF800
+    ArtIpProgReply = 0xF900
+    ArtAddress = 0x6000
 
 
 def is_artnet(data: bytes) -> bool:
     return data.startswith(ART_NET_HEADER)
 
 
-def parse_poll(data: bytes) -> Optional[dict[str, Any]]:
+def parse_header(data: bytearray) -> OpCode | None:
+    if is_artnet(data) and len(data) >= 10:
+        op_code_from_byte = struct.unpack("<H", data[8:10])[0]
+        return OpCode(op_code_from_byte)
+    else:
+        return None
+
+
+def parse_poll(data: bytes) -> ArtNetFieldDict:
     if len(data) < 22:
         return None
 
@@ -45,7 +56,7 @@ def parse_poll(data: bytes) -> Optional[dict[str, Any]]:
     return reply
 
 
-def parse_poll_reply(data: bytes) -> Optional[dict[str, Any]]:
+def parse_poll_reply(data: bytes) -> ArtNetFieldDict:
     if len(data) < 239:
         return None
 
@@ -87,7 +98,7 @@ def parse_poll_reply(data: bytes) -> Optional[dict[str, Any]]:
     return reply
 
 
-def parse_artdmx(data: bytes) -> Optional[dict[str, Any]]:
+def parse_artdmx(data: bytes) -> ArtNetFieldDict:
     if len(data) < 18:
         return None
 
@@ -103,7 +114,7 @@ def parse_artdmx(data: bytes) -> Optional[dict[str, Any]]:
     return reply
 
 
-def parse_nzs(data: bytes) -> Optional[dict[str, Any]]:
+def parse_nzs(data: bytes) -> ArtNetFieldDict:
     if len(data) < 18:
         return None
 
@@ -119,7 +130,7 @@ def parse_nzs(data: bytes) -> Optional[dict[str, Any]]:
     return reply
 
 
-def parse_sync(data: bytes) -> Optional[dict[str, Any]]:
+def parse_sync(data: bytes) -> ArtNetFieldDict:
     if len(data) < 13:
         return None
 
@@ -132,7 +143,7 @@ def parse_sync(data: bytes) -> Optional[dict[str, Any]]:
     return reply
 
 
-def parse_trigger(data: bytes) -> Optional[dict[str, Any]]:
+def parse_trigger(data: bytes) -> ArtNetFieldDict:
     if len(data) < 18:
         return None
 
@@ -147,7 +158,7 @@ def parse_trigger(data: bytes) -> Optional[dict[str, Any]]:
     return reply
 
 
-def parse_ip_prog(data: bytes) -> Optional[dict[str, Any]]:
+def parse_ip_prog(data: bytes) -> ArtNetFieldDict:
     if len(data) < 32:
         return None
 
@@ -167,7 +178,7 @@ def parse_ip_prog(data: bytes) -> Optional[dict[str, Any]]:
     return reply
 
 
-def parse_ip_prog_reply(data: bytes) -> Optional[dict[str, Any]]:
+def parse_ip_prog_reply(data: bytes) -> ArtNetFieldDict:
     if len(data) < 34:
         return None
 
@@ -190,7 +201,7 @@ def parse_ip_prog_reply(data: bytes) -> Optional[dict[str, Any]]:
     return reply
 
 
-def parse_address(data: bytes) -> Optional[dict[str, Any]]:
+def parse_address(data: bytes) -> ArtNetFieldDict:
     if len(data) < 107:
         return None
 
@@ -210,7 +221,7 @@ def parse_address(data: bytes) -> Optional[dict[str, Any]]:
     return reply
 
 
-def parse_command(data: bytes) -> Optional[dict[str, Any]]:
+def parse_command(data: bytes) -> ArtNetFieldDict:
     if len(data) < 14:
         return None
 
@@ -247,11 +258,11 @@ ARTNET_REPLY_PARSER = {
 
 def pack_ip(
     dhcp: bool = False,
-    prog_ip: Optional[str] = None,
-    prog_sm: Optional[str] = None,
-    prog_gw: Optional[str] = None,
+    prog_ip: str | None = None,
+    prog_sm: str | None = None,
+    prog_gw: str | None = None,
     set_default: bool = False,
-    prog_port: Optional[int] = None,
+    prog_port: int | None = None,
 ) -> bytes:
     # Convert IP, subnet mask, and gateway to bytes
     ip_bytes = (
@@ -308,9 +319,10 @@ def pack_ip(
 
     command_byte = struct.pack("<B", command)
 
+    op_code = struct.pack("<H", OpCode.ArtIpProg.value)
     packet = (
         ART_NET_HEADER
-        + OpCode.ArtIpProg.value
+        + op_code
         + ART_NET_VERSION
         + b"\x00" * 2  # Filler 1 + 2
         + command_byte  # Command
@@ -367,9 +379,10 @@ def pack_address(
         long_name_byte = long_name_byte[:63]
     long_name_byte += b"\x00" * (64 - len(long_name_byte))
 
+    op_code = struct.pack("<H", OpCode.ArtAddress.value)
     packet = (
         ART_NET_HEADER
-        + OpCode.ArtAddress.value
+        + op_code
         + ART_NET_VERSION
         + net_switch_byte  # Net switch: Bits 14-8 in bottom 7 bits
         + b"\x00"  # Bind index
@@ -415,9 +428,10 @@ def pack_poll() -> bytes:
     # Bottom range
     target_port_address_bottom = struct.pack("<H", 0)
 
+    op_code = struct.pack("<H", OpCode.ArtPoll.value)
     packet = (
         ART_NET_HEADER
-        + OpCode.ArtPoll.value
+        + op_code
         + ART_NET_VERSION
         + flags
         + diag_prio
@@ -445,10 +459,13 @@ def pack_dmx(universe15bit: int, seq: int, dmx_data: bytearray) -> bytes:
     # Length of DMX data
     dmx_length = struct.pack(">H", size)
 
+    # OpCode
+    op_code = struct.pack("<H", OpCode.ArtDmx.value)
+
     # Assemble the packet
     packet = (
         ART_NET_HEADER
-        + OpCode.ArtDmx.value
+        + op_code
         + ART_NET_VERSION
         + sequence
         + physical
@@ -477,10 +494,14 @@ def pack_nzs(
     # Length of DMX data
     dmx_length = struct.pack(">H", size)
 
+
+    # OpCode
+    op_code = struct.pack("<H", OpCode.ArtNzs.value)
+
     # Assemble the packet
     packet = (
         ART_NET_HEADER
-        + OpCode.ArtNzs.value
+        + op_code
         + ART_NET_VERSION
         + seq
         + code
@@ -496,9 +517,10 @@ def pack_trigger(key: int, subkey: int, data: bytearray = b"") -> bytes:
     key_byte = struct.pack("<B", key)
     subkey_byte = struct.pack("<B", subkey)
     filler = struct.pack("<H", 0x0000)
+    op_code = struct.pack("<H", OpCode.ArtTrigger.value)
     packet = (
         ART_NET_HEADER
-        + OpCode.ArtTrigger.value
+        + op_code
         + ART_NET_VERSION
         + filler
         + ART_NET_OEM
@@ -513,6 +535,7 @@ def pack_trigger(key: int, subkey: int, data: bytearray = b"") -> bytes:
 def pack_sync() -> bytes:
     # Aux1 (Int8) and Aux1 (Int8) - Transmit as zero
     aux = b"\x00" * 2
-    packet = ART_NET_HEADER + OpCode.ArtSync.value + ART_NET_VERSION + aux
+    op_code = struct.pack("<H", OpCode.ArtSync.value)
+    packet = ART_NET_HEADER + op_code + ART_NET_VERSION + aux
 
     return packet
