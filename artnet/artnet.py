@@ -1,5 +1,5 @@
 import socket
-from enum import Enum
+from enum import IntEnum
 from typing import Callable
 
 from .helper import (
@@ -18,7 +18,7 @@ from .helper import (
 ART_NET_PORT = 6454
 
 
-class TriggerKey(Enum):
+class TriggerKey(IntEnum):
     ASCII = 0
     MACRO = 1
     SOFT = 2

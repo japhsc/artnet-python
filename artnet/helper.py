@@ -1,5 +1,5 @@
 import struct
-from enum import Enum
+from enum import IntEnum
 
 
 ArtNetFieldDict = dict[str: any] | None
@@ -12,7 +12,7 @@ ART_NET_OEM = struct.pack("<H", 0x00FF)  # OEM code OemUnknown 0x00ff
 ART_NET_ESTA_MAN = struct.pack("<H", 0)  # ESTA Manufacturer code
 
 
-class OpCode(Enum):
+class OpCode(IntEnum):
     ArtPoll = 0x2000
     ArtPollReply = 0x2100
     ArtCommand = 0x2400
@@ -319,7 +319,7 @@ def pack_ip(
 
     command_byte = struct.pack("<B", command)
 
-    op_code = struct.pack("<H", OpCode.ArtIpProg.value)
+    op_code = struct.pack("<H", OpCode.ArtIpProg)
     packet = (
         ART_NET_HEADER
         + op_code
@@ -379,7 +379,7 @@ def pack_address(
         long_name_byte = long_name_byte[:63]
     long_name_byte += b"\x00" * (64 - len(long_name_byte))
 
-    op_code = struct.pack("<H", OpCode.ArtAddress.value)
+    op_code = struct.pack("<H", OpCode.ArtAddress)
     packet = (
         ART_NET_HEADER
         + op_code
@@ -428,7 +428,7 @@ def pack_poll() -> bytes:
     # Bottom range
     target_port_address_bottom = struct.pack("<H", 0)
 
-    op_code = struct.pack("<H", OpCode.ArtPoll.value)
+    op_code = struct.pack("<H", OpCode.ArtPoll)
     packet = (
         ART_NET_HEADER
         + op_code
@@ -460,7 +460,7 @@ def pack_dmx(universe15bit: int, seq: int, dmx_data: bytearray) -> bytes:
     dmx_length = struct.pack(">H", size)
 
     # OpCode
-    op_code = struct.pack("<H", OpCode.ArtDmx.value)
+    op_code = struct.pack("<H", OpCode.ArtDmx)
 
     # Assemble the packet
     packet = (
@@ -496,7 +496,7 @@ def pack_nzs(
 
 
     # OpCode
-    op_code = struct.pack("<H", OpCode.ArtNzs.value)
+    op_code = struct.pack("<H", OpCode.ArtNzs)
 
     # Assemble the packet
     packet = (
@@ -517,7 +517,7 @@ def pack_trigger(key: int, subkey: int, data: bytearray = b"") -> bytes:
     key_byte = struct.pack("<B", key)
     subkey_byte = struct.pack("<B", subkey)
     filler = struct.pack("<H", 0x0000)
-    op_code = struct.pack("<H", OpCode.ArtTrigger.value)
+    op_code = struct.pack("<H", OpCode.ArtTrigger)
     packet = (
         ART_NET_HEADER
         + op_code
@@ -535,7 +535,7 @@ def pack_trigger(key: int, subkey: int, data: bytearray = b"") -> bytes:
 def pack_sync() -> bytes:
     # Aux1 (Int8) and Aux1 (Int8) - Transmit as zero
     aux = b"\x00" * 2
-    op_code = struct.pack("<H", OpCode.ArtSync.value)
+    op_code = struct.pack("<H", OpCode.ArtSync)
     packet = ART_NET_HEADER + op_code + ART_NET_VERSION + aux
 
     return packet
